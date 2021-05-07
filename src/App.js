@@ -29,7 +29,9 @@ const deselectedSidebar ="#aba624";
 //const testContract = "0x0E627548eEcCc1629742B6519B04735203Ed7FFE";
 //const testContract = "0xEc67ddCB262D7d13Bd306013A3E8C5e9fd24b9F2";
 //const testContract = "0x22421c7782188422fC6517bA771aC52Bdc9B26a7";
-const testContract = "0x9323034A47d7D934FF4e432337f88E0DA66fBFEB"; // alpha ready for mainnet with "sending to contract fix"
+//const testContract = "0x9323034A47d7D934FF4e432337f88E0DA66fBFEB"; // fix can no longer send order to contract
+//const testContract = "0x6414f85fece3014B4e7372D8B75132e5D7654cd1"; // can remove bounty and amount sent from non-finalized order
+const testContract = "0x5dd619Fa01D18bAe58fFAd6d24eB7E84e577A1a0"; //fix removeFromOrder function
 class App extends Component{
   constructor(){
     super();
@@ -38,6 +40,7 @@ class App extends Component{
     this.web3=null;
     this.list=[];//list of orders to display in viewer
     this.maxSeconds=604800;//display orders releasable within 7 days
+    this.minSeconds=0;//display orders releasable within 7 days
     this.maxOrders=20;//display 100 most recent orders
     this.timeOffset=0;//UTC offset by hours
     this.address="Not Connected";
@@ -69,9 +72,10 @@ class App extends Component{
     this.isTime=this.isTime.bind(this);
     this.orderFilter=this.orderFilter.bind(this);
     this.loadTotalAmounts=this.loadTotalAmounts.bind(this);
+    this.removeFromOrder=this.removeFromOrder.bind(this);
     //////load tabular order data for ag grid viewer element
-    this.abi=[{"inputs":[{"internalType":"address","name":"source","type":"address"},{"internalType":"address","name":"sink","type":"address"},{"internalType":"uint256","name":"time","type":"uint256"},{"internalType":"bool","name":"bounty","type":"bool"}],"name":"addToOrder","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"address","name":"sink","type":"address"},{"internalType":"uint256","name":"time","type":"uint256"}],"name":"cancelOrder","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"completedAmount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"completedBounty","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"sink","type":"address"},{"internalType":"uint256","name":"time","type":"uint256"}],"name":"finalize","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"head","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"},{"internalType":"address","name":"","type":"address"}],"name":"incoming","outputs":[{"internalType":"address","name":"prev","type":"address"},{"internalType":"address","name":"next","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"incomingHeads","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"},{"internalType":"address","name":"","type":"address"}],"name":"orderHeads","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"},{"internalType":"address","name":"","type":"address"},{"internalType":"uint256","name":"","type":"uint256"}],"name":"orders","outputs":[{"internalType":"uint256","name":"prev","type":"uint256"},{"internalType":"uint256","name":"next","type":"uint256"},{"internalType":"uint256","name":"bounty","type":"uint256"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"bool","name":"finalized","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"outAmount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"outBounty","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"},{"internalType":"address","name":"","type":"address"}],"name":"party","outputs":[{"internalType":"address","name":"prev","type":"address"},{"internalType":"address","name":"next","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"partyHeads","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"source","type":"address"},{"internalType":"address","name":"sink","type":"address"},{"internalType":"uint256","name":"time","type":"uint256"}],"name":"release","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"sink","type":"address"},{"internalType":"uint256","name":"bounty","type":"uint256"},{"internalType":"uint256","name":"time","type":"uint256"},{"internalType":"bool","name":"finalized","type":"bool"}],"name":"send","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"users","outputs":[{"internalType":"address","name":"prev","type":"address"},{"internalType":"address","name":"next","type":"address"}],"stateMutability":"view","type":"function"},{"stateMutability":"payable","type":"receive"}];
-
+    /*this.abi=[{"inputs":[{"internalType":"address","name":"source","type":"address"},{"internalType":"address","name":"sink","type":"address"},{"internalType":"uint256","name":"time","type":"uint256"},{"internalType":"bool","name":"bounty","type":"bool"}],"name":"addToOrder","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"address","name":"sink","type":"address"},{"internalType":"uint256","name":"time","type":"uint256"}],"name":"cancelOrder","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"completedAmount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"completedBounty","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"sink","type":"address"},{"internalType":"uint256","name":"time","type":"uint256"}],"name":"finalize","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"head","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"},{"internalType":"address","name":"","type":"address"}],"name":"incoming","outputs":[{"internalType":"address","name":"prev","type":"address"},{"internalType":"address","name":"next","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"incomingHeads","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"},{"internalType":"address","name":"","type":"address"}],"name":"orderHeads","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"},{"internalType":"address","name":"","type":"address"},{"internalType":"uint256","name":"","type":"uint256"}],"name":"orders","outputs":[{"internalType":"uint256","name":"prev","type":"uint256"},{"internalType":"uint256","name":"next","type":"uint256"},{"internalType":"uint256","name":"bounty","type":"uint256"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"bool","name":"finalized","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"outAmount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"outBounty","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"},{"internalType":"address","name":"","type":"address"}],"name":"party","outputs":[{"internalType":"address","name":"prev","type":"address"},{"internalType":"address","name":"next","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"partyHeads","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"source","type":"address"},{"internalType":"address","name":"sink","type":"address"},{"internalType":"uint256","name":"time","type":"uint256"}],"name":"release","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"sink","type":"address"},{"internalType":"uint256","name":"bounty","type":"uint256"},{"internalType":"uint256","name":"time","type":"uint256"},{"internalType":"bool","name":"finalized","type":"bool"}],"name":"send","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"users","outputs":[{"internalType":"address","name":"prev","type":"address"},{"internalType":"address","name":"next","type":"address"}],"stateMutability":"view","type":"function"},{"stateMutability":"payable","type":"receive"}];*/
+    this.abi=[{"inputs":[{"internalType":"address","name":"source","type":"address"},{"internalType":"address","name":"sink","type":"address"},{"internalType":"uint256","name":"time","type":"uint256"},{"internalType":"bool","name":"bounty","type":"bool"}],"name":"addToOrder","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"address","name":"sink","type":"address"},{"internalType":"uint256","name":"time","type":"uint256"}],"name":"cancelOrder","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"sink","type":"address"},{"internalType":"uint256","name":"time","type":"uint256"}],"name":"finalize","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"source","type":"address"},{"internalType":"address","name":"sink","type":"address"},{"internalType":"uint256","name":"time","type":"uint256"}],"name":"release","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"sink","type":"address"},{"internalType":"uint256","name":"time","type":"uint256"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"bool","name":"bounty","type":"bool"}],"name":"removeFromOrder","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"sink","type":"address"},{"internalType":"uint256","name":"bounty","type":"uint256"},{"internalType":"uint256","name":"time","type":"uint256"},{"internalType":"bool","name":"finalized","type":"bool"}],"name":"send","outputs":[],"stateMutability":"payable","type":"function"},{"stateMutability":"payable","type":"receive"},{"inputs":[],"name":"completedAmount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"completedBounty","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"head","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"},{"internalType":"address","name":"","type":"address"}],"name":"incoming","outputs":[{"internalType":"address","name":"prev","type":"address"},{"internalType":"address","name":"next","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"incomingHeads","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"},{"internalType":"address","name":"","type":"address"}],"name":"orderHeads","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"},{"internalType":"address","name":"","type":"address"},{"internalType":"uint256","name":"","type":"uint256"}],"name":"orders","outputs":[{"internalType":"uint256","name":"prev","type":"uint256"},{"internalType":"uint256","name":"next","type":"uint256"},{"internalType":"uint256","name":"bounty","type":"uint256"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"bool","name":"finalized","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"outAmount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"outBounty","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"},{"internalType":"address","name":"","type":"address"}],"name":"party","outputs":[{"internalType":"address","name":"prev","type":"address"},{"internalType":"address","name":"next","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"partyHeads","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"users","outputs":[{"internalType":"address","name":"prev","type":"address"},{"internalType":"address","name":"next","type":"address"}],"stateMutability":"view","type":"function"}];
     //////
     this.autoUpdate();
     setInterval(this.autoUpdate, 1000);
@@ -102,8 +106,9 @@ class App extends Component{
         }
       }
       if(!this.hooked){
-        document.getElementById("maxNumOrders").value ="20";
+        document.getElementById("maxNumOrders").value =this.maxOrders.toString();
         document.getElementById("maxTimeOrders").value = "7";
+        document.getElementById("minTimeOrders").value = "0";
         document.getElementById("finalize").value2=false;
         this.maxSeconds=Math.floor(Date.now()/1000)+ 604800;
         window.ethereum.on('accountsChanged', (accounts) => {
@@ -293,6 +298,11 @@ class App extends Component{
       d.setDate(d.getDate() + parseInt(document.getElementById('maxTimeOrders').value));
       this.maxSeconds=Math.floor(d.getTime()/1000);
     }
+    if(this.isTime(document.getElementById('minTimeOrders').value)&&document.getElementById('minTimeOrders').value.length>0){
+      let d = new Date();
+      d.setDate(d.getDate() + parseInt(document.getElementById('minTimeOrders').value));
+      this.minSeconds=Math.floor(d.getTime()/1000);
+    }
     if(this.isTime(document.getElementById('maxNumOrders').value)&&document.getElementById('maxNumOrders').value.length>0){
       this.maxOrders=parseInt(document.getElementById('maxNumOrders').value);
     }
@@ -305,22 +315,21 @@ class App extends Component{
       if(!this.contract||this.contractAddress.toLowerCase()!=this.contract.address.toLowerCase()){
         this.contract = new ethers.Contract(this.contractAddress, this.abi, this.provider.getSigner());
       }
-      this.loadTotalAmounts();
       let user = await this.contract.head();
       let party = await this.contract.partyHeads(user);
       let time = (await this.contract.orderHeads(user,party)).toString();
       let order = await this.contract.orders(user,party,time);
       let fin = null;
-      this.list=[];
-      let i =0; let j=5
+      let x=[];
+      let i =0; const j = parseInt(this.maxOrders.toString());
       BigNumber.set({ DECIMAL_PLACES: 18 });
       while(i<j&&user){
         while(i<j&&party){
-          while(i<j&&"0"!=time&&this.list.length<this.maxOrders){
+          while(i<j&&"0"!=time){
             if(order.finalized){fin="Yes";}
             else{fin="No";}
             if(BigNumber(time).isLessThan(this.maxSeconds)){
-              this.list.push({
+              x.push({
                 Sender: user,
                 Receiver: party,
                 "Finalized?": fin,
@@ -339,6 +348,8 @@ class App extends Component{
         }
         user = await this.contract.users(user).next;
       }
+      this.list=x;
+      this.loadTotalAmounts();
     }
   }
   async search(user,party){
@@ -371,7 +382,6 @@ class App extends Component{
       catch(e){}
     }
   }
-  //input = string,string,string,string, boolean = string x 4, boolean
   async send(receiver,time,amount,bounty,finalized){
     receiver.replace(/\s+/g, '');
     time.replace(/\s+'&nbsp'+/g, '');
@@ -461,12 +471,11 @@ class App extends Component{
     bnb= this.stringCleaner(bnb);
     receiver= this.stringCleaner(receiver);
     sender= this.stringCleaner(sender);
-    if(await this.isConnected())
-    {
+    if(await this.isConnected()){
       try{
         const order = await this.contract.orders(sender,receiver,time);
         const confirm = "Are you sure you want to Add to Order ?"
-                        +"\n Sender - "+ receiver
+                        +"\n Sender - "+ sender
                         +"\n Receiver - "+ receiver
                         +"\n Time              - "+ this.secToDate(new Date(parseInt(time)))
                         +"\n Current BNB to Send  - "+ethers.utils.formatEther(order.amount.toString())+ " BNB"
@@ -490,6 +499,48 @@ class App extends Component{
         else if (window.confirm(confirm)){
           bnb = (new BigNumber(bnb)).multipliedBy("1000000000000000000").toString();
           await this.contract.addToOrder(this.address,receiver,time,isBounty,{gasPrice: 10000000000, gasLimit: 45000, value: bnb});
+        }
+      }
+      catch(e){}
+    }
+  }
+  async removeFromOrder(receiver,time,bnb,isBounty){
+    receiver.replace(/\s+/g, '');
+    time.replace(/\s+'&nbsp'+/g, '');
+    bnb.replace(/\s+/g, '');
+    time=this.stringCleaner(time);
+    bnb= this.stringCleaner(bnb);
+    receiver= this.stringCleaner(receiver);
+    if(await this.isConnected()){
+      try{
+        const order= await this.contract.orders(this.address,receiver,time);
+        const confirm = "Are you sure you want to Modify Order ?"
+                        +"\n Receiver - "+ receiver
+                        +"\n Time              - "+ this.secToDate(new Date(parseInt(time)))
+                        +"\n Current BNB to Send  - "+ethers.utils.formatEther(order.amount.toString())+ " BNB"
+                        +"\n Current Bounty / Fee - "+ethers.utils.formatEther(order.bounty.toString())+ " BNB"
+                        +"\n Removing - "+bnb+" from "+(isBounty?"Bounty":"Sent amount");
+        if(!this.isAddress(receiver)){
+          window.alert("Invalid receiver address");
+        }
+        else if(!this.isTime(time)){
+          window.alert("Invalid time");
+        }
+        else if(!this.isUint(bnb)){
+          window.alert("Invalid amount");
+        }
+        else if (isBounty==false&&!BigNumber(bnb).multipliedBy("1000000000000000000").minus(order.amount).isNegative()){
+          window.alert("  Amount  must be less than \n total order amount to be sent \n     (cancel order instead)");
+        }
+        else if (isBounty==true&&BigNumber(order.bounty.toString()).isLessThan(BigNumber(bnb).multipliedBy("1000000000000000000"))){
+          window.alert("Bounty to remove from order cannot be\n   greater than total bounty in order");
+        }
+        else if(order.amount.isZero()){
+          window.alert("Order does not exist");
+        }
+        else if (window.confirm(confirm)){
+          bnb = (new BigNumber(bnb)).multipliedBy("1000000000000000000").toString();
+          await this.contract.removeFromOrder(receiver,time,bnb,isBounty,{gasPrice: 10000000000, gasLimit: 60000});
         }
       }
       catch(e){}
@@ -565,7 +616,7 @@ class App extends Component{
     let x='';
     let i=0;
     while(i<str.length){
-      if(str.charCodeAt(i)!=32){
+      if(str.charCodeAt(i)!=32&&str.charAt(i)!=' '){
         x+=str.charAt(i);
       }
       i++;
@@ -619,6 +670,11 @@ class App extends Component{
               / Completed = {this.completedAmount}
             </h10>
           </div>
+          <p style={{fontSize:"12px",color:'#00b7db',position:'relative',left:'100px',top:'10px'}}>
+            {this.chain} {this.address!="Not Connected"?"Contract":""} {" "}
+            <br></br>
+            {this.contractAddress}
+          </p>
           </Navbar.Collapse>
         </Navbar>
         <div id="sidebar" style={{backgroundColor:"#4e8eca",width:"190px",minHeight:"720px",float:"left"}}>
@@ -689,7 +745,7 @@ class App extends Component{
               )}style={{
               backgroundColor:"green",fontSize:"13px",minWidth:"73px",fontWeight:"bold",cursor:"pointer",
               color:"#ff8fb6",marginLeft:"28px",marginTop:"5px",height:"40px"}}/>
-            <Button as="input"type ="Button"value="Increase Amount"onClick={() => this.addToOrder(
+            <Button as="input"type ="Button"value="Increase Amount +"onClick={() => this.addToOrder(
                 document.getElementById("sender").value,
                 document.getElementById("receiver").value,
                 document.getElementById("time").value,
@@ -698,7 +754,7 @@ class App extends Component{
               )}style={{
               backgroundColor:"green",minWidth:"100px",fontSize:"13px",fontWeight:"bold",cursor:"pointer",
               color:"yellow",marginTop:"5px",width:"170px",marginLeft:"5px",height:"35px"}}/>
-            <Button as="input"type ="Button"value="Increase Bounty"onClick={() => this.addToOrder(
+            <Button as="input"type ="Button"value="Increase Bounty +"onClick={() => this.addToOrder(
                 document.getElementById("sender").value,
                 document.getElementById("receiver").value,
                 document.getElementById("time").value,
@@ -707,23 +763,30 @@ class App extends Component{
               )}style={{
                 backgroundColor:"green",minWidth:"100px",fontSize:"13px",fontWeight:"bold",cursor:"pointer",
                 color:"yellow",marginTop:"5px",marginLeft:"5px",width:"170px",height:"35px"}}/>
+            <Button as="input"type ="Button"value="Decrease Amount -"onClick={() => this.removeFromOrder(
+              document.getElementById("receiver").value,
+              document.getElementById("time").value,
+              document.getElementById("bounty").value,
+              false
+            )}style={{
+              backgroundColor:"green",minWidth:"100px",fontSize:"13px",fontWeight:"bold",cursor:"pointer",
+              color:"black",marginTop:"5px",marginLeft:"5px",width:"170px",height:"35px"}}/>
+            <Button as="input"type ="Button"value="Decrease Bounty -"onClick={() => this.removeFromOrder(
+                document.getElementById("receiver").value,
+                document.getElementById("time").value,
+                document.getElementById("bounty").value,
+                true
+              )}style={{
+                backgroundColor:"green",minWidth:"100px",fontSize:"13px",fontWeight:"bold",cursor:"pointer",
+                color:"black",marginTop:"5px",marginLeft:"5px",width:"170px",height:"35px"}}/>
           </div>
         </div>
         <h7 style={{color:"yellow"}}>
-          <div id="viewer" style={{backgroundColor:"#1f1f1f",width:"1518px",height:"720px"}}>
-              <div id="infoBox" className="overflow-auto"style={{position:'relative',backgroundColor:"#1f1f1f",height:"inherit",padding:"10px"}}>
+          <div id="viewer" style={{backgroundColor:"#1f1f1f",width:"1500",height:"720px"}}>
+              <div id="infoBox" style={{overflowX:'hidden',overflowY:'auto',position:'relative',backgroundColor:"#1f1f1f",height:"inherit",padding:"10px"}}>
                 <div style={{marginLeft:"10px",color: "orange"}}>
-                  {"Max Orders Loaded"}
-                  <input id ="maxNumOrders" type="number"min="0" pattern="^\d*\s*$"style={{marginLeft:"10px",marginRight:"10px",width:"100px",marginTop:"3px"}}/>
-                  {"Max Days in Countdown"}
-                  <input id ="maxTimeOrders" type="number"min="0" pattern="^\d*\s*$"style={{marginLeft:"10px",marginRight:"10px",width:"100px",marginTop:"3px"}}/>
-                  <div style={{position:'relative',left:'540px',top:'-30px'}}>
-                    <Button as="input"type ="Button"value="↻"onClick={this.handleBounty} style={{color:"yellow",fontWeight:'bold',padding:"2px",paddingLeft:"7px",paddingBottom:"7px",paddingRight:"7px",fontSize:'25px',borderRadius:"100px",lineHeight:'0em',backgroundColor:"#3471eb",marginLeft:"10px",width:"20x",height:"35px",marginBottom:"8px"}}/>
-                  </div>
-                  <div style={{position:'relative',left:'600px',top:'-70px'}}>
-                    Selectable Rows ?
-                  </div>
-                  <div id="clickSelect"style={{position:'relative',left:'730px',top:'-90px'}}>
+                  Selectable Rows ?
+                  <div id="clickSelect"style={{position:'relative',left:'138px',top:'-20px'}}>
                     <ToggleButton
                     value={this.state.value ||false}
                     colors={{
@@ -737,13 +800,19 @@ class App extends Component{
                       document.getElementById("clickSelect").value=!value;
                     }} />
                   </div>
-                  <p style={{height:"30px",marginBottom:"6px",fontSize:"12px",color:'#00b7db',position:'relative',left:'790px',top:'-120px'}}>
-                    {this.chain} {this.address!="Not Connected"?"Contract":""} {" "}
-                    <br></br>
-                    {this.contractAddress}
-                  </p>
+                  <div style={{position:'relative',top:'-50px',left:'220px'}}>
+                    {"Max Orders Loaded"}
+                    <input id ="maxNumOrders" type="number"min="0" pattern="^\d*\s*$"style={{marginLeft:"10px",marginRight:"25px",width:"100px",marginTop:"3px"}}/>
+                    <input id ="minTimeOrders" type="number"min="0" pattern="^\d*\s*$"style={{marginLeft:"10px",marginRight:"10px",width:"100px",marginTop:"3px"}}/>
+                    {" ≤ Countdown Days ≤ "}
+                    <input id ="maxTimeOrders" type="number"min="0" pattern="^\d*\s*$"style={{marginLeft:"10px",marginRight:"10px",width:"100px",marginTop:"3px"}}/>
+                    <div style={{position:'relative',left:'690px',top:'-30px'}}>
+                      <Button as="input"type ="Button"value="↻"onClick={this.handleBounty} style={{color:"yellow",fontWeight:'bold',padding:"2px",paddingLeft:"7px",paddingBottom:"7px",
+                        paddingRight:"7px",fontSize:'25px',borderRadius:"100px",lineHeight:'0em',backgroundColor:"#3471eb",marginLeft:"30px",width:"20x",height:"35px",marginBottom:"8px"}}/>
+                    </div>
+                  </div>
                 </div>
-                <hr style={{marginTop:"-100px",borderColor:"#4e8eca"}}></hr>
+                <hr style={{marginTop:"-70px",borderColor:"#4e8eca"}}></hr>
                 <hr style={{marginTop:"-30px",borderColor:"#4e8eca",position:'relative',top:'45px'}}></hr>
                 <AgGridReact
                   id="grid"

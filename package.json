@@ -22,7 +22,7 @@
     "web3": "^1.3.4",
     "web3modal": "^1.9.3"
   },
-  "homepage": "https://github.com/thelambodan/bsc-timer.git",
+  "homepage": ".",
   "scripts": {
     "predeploy":"npm run build",
     "deploy":"gh-pages -d build",
