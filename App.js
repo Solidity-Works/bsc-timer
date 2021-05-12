@@ -656,9 +656,10 @@ class App extends Component{
     document.getElementById("bounty").value =row.data["Bounty ↕"];
   }
   render(){
+    document.title="BSC Timer";
     return(
       <div>{/*all elements must be contained in 1 div*/}
-        <Navbar sticky="top" bg = 'dark' style={{maxHeight:"55px",whiteSpace:"nowrap",width:"auto"}}>
+        <Navbar sticky="top" bg = 'dark' style={{maxHeight:"55px",whiteSpace:"nowrap",minWidth:"1300px"}}>
           {/*<Navbar.Brand href="./">*/}
           <Navbar.Brand>
             <h3 style = {{color: 'yellow'}}>BSC Timer ⌛ </h3>
@@ -691,11 +692,17 @@ class App extends Component{
               / Completed = {this.completedAmount}
             </h10>
           </div>
-          <p style={{fontSize:"12px",color:'#00b7db',position:'relative',left:'50px',top:'10px'}}>
-            {this.chain} {this.address!="Not Connected"?"Contract":""} {" "}
-            <br></br>
-            {this.contractAddress}
-          </p>
+          <div>
+            <a href="https://t.me/bsctimer" style={{marginLeft:"10px"}}>
+              <img src="https://osx.telegram.org/updates/site/logo.png" alt="telegram" width="40px" height="40px"></img>
+            </a>
+            <a href="https://twitter.com/solidityworks" style={{marginLeft:"10px"}}>
+              <img src="https://twemoji.twitter.com/content/dam/twemoji-twitter/Twitter_Social_Icon_Circle_Color.png.twimg.1920.png" alt="twitter" width="36px" height="36px"></img>
+            </a>
+            <a href="https://github.com/thelambodan/bsc-timer/tree/master">
+              <img src="https://logos-world.net/wp-content/uploads/2020/11/GitHub-Logo.png" alt="github" width="70px" height="35px"></img>
+            </a>
+          </div>
           </Navbar.Collapse>
         </Navbar>
         <div id="sidebar" style={{backgroundColor:"#4e8eca",width:"190px",minHeight:"720px",float:"left"}}>
@@ -746,7 +753,7 @@ class App extends Component{
                 document.getElementById("finalize").value2
               )}
               style={{backgroundColor:"green",fontSize:"13px",fontWeight:"bold",cursor:"pointer",
-              color:"#2eff5f",marginLeft:"3px",minWidth:"70px",marginTop:"5px",height:"40px"}}/>
+              color:"#62ff00",marginLeft:"3px",minWidth:"70px",marginTop:"5px",height:"40px"}}/>
             <Button as="input"type ="Button"value="Release"onClick={() => this.release(
                 document.getElementById("sender").value,
                 document.getElementById("receiver").value,
@@ -803,7 +810,7 @@ class App extends Component{
           </div>
         </div>
         <h7 style={{color:"yellow"}}>
-          <div id="viewer" style={{backgroundColor:"#1f1f1f",width:"auto",height:"720px"}}>
+          <div id="viewer" style={{backgroundColor:"#1f1f1f",width:"auto",minWidth:"1300px",height:"720px"}}>
               <div id="infoBox" style={{overflowX:'hidden',overflowY:'auto',position:'relative',backgroundColor:"#1f1f1f",height:"inherit",padding:"10px"}}>
                 <div style={{marginLeft:"10px",color: "orange"}}>
                   Selectable Rows ?
@@ -831,9 +838,14 @@ class App extends Component{
                       <Button as="input"type ="Button"value="↻"onClick={this.handleBounty} style={{color:"yellow",fontWeight:'bold',padding:"2px",paddingLeft:"7px",paddingBottom:"7px",
                         paddingRight:"7px",fontSize:'25px',borderRadius:"100px",lineHeight:'0em',backgroundColor:"#3471eb",marginLeft:"30px",width:"20x",height:"35px",marginBottom:"8px"}}/>
                     </div>
+                    <p style={{height:"25",fontSize:"12px",color:'#00b7db',position:'relative',left:'750px',top:'-70px'}}>
+                      {this.chain} {this.address!="Not Connected"?"Contract":""} {" "}
+                      <br></br>
+                      {this.contractAddress}
+                    </p>
                   </div>
                 </div>
-                <hr style={{marginTop:"-70px",borderColor:"#4e8eca"}}></hr>
+                <hr style={{marginTop:"-120px",borderColor:"#4e8eca"}}></hr>
                 <hr style={{marginTop:"-30px",borderColor:"#4e8eca",position:'relative',top:'45px'}}></hr>
                 <AgGridReact
                   id="grid"
