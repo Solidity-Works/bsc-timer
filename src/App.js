@@ -7,7 +7,9 @@ import DropdownButton from 'react-bootstrap/DropdownButton';
 import ToggleButton from 'react-toggle-button';
 
 import BigNumber from 'bignumber.js';
-import {ethers} from 'ethers';
+import {ethers,providers} from 'ethers';
+//import WalletConnectProvider from "@walletconnect/web3-provider";
+//import WalletConnect from "@walletconnect/client";
 //import Web3Connect from "web3connect";
 
 import { AgGridColumn, AgGridReact } from 'ag-grid-react';
@@ -19,8 +21,6 @@ import 'ag-grid-community/dist/styles/ag-theme-alpine.css';
   * Contributor Big Bo
   * Main Developer Joshua James
 */
-const selectedSidebar ="#d9d332";
-const deselectedSidebar ="#aba624";
 //const Testnet 0x6EbB2a5a6CB4F268939D9e8d70802be364338d40
 //const testContract = "0x6393c0b01224ed9cae98bff6e3b488b1190d5aa3" //first alpha version with no errors
 //const testContract = "0x32555b0B945d3ed9831EdAF01348E1a61c0F9FC2";
@@ -32,6 +32,9 @@ const deselectedSidebar ="#aba624";
 //const testContract = "0x9323034A47d7D934FF4e432337f88E0DA66fBFEB"; // fix can no longer send order to contract
 //const testContract = "0x6414f85fece3014B4e7372D8B75132e5D7654cd1"; // can remove bounty and amount sent from non-finalized order
 const testContract = "0x5dd619Fa01D18bAe58fFAd6d24eB7E84e577A1a0"; //fix removeFromOrder function
+const mainContract = "0x3D45DB12E607aa21207C8CdF2a17A00939e65802";
+const selectedSidebar ="#d9d332";
+const deselectedSidebar ="#aba624";
 class App extends Component{
   constructor(){
     super();
@@ -81,10 +84,12 @@ class App extends Component{
     setInterval(this.autoUpdate, 1000);
   }
   async loadTotalAmounts(){
-    this.pendingAmount= ethers.utils.formatEther((await this.contract.outAmount()).toString()).substr(0,4);
-    this.pendingBounty= ethers.utils.formatEther((await this.contract.outBounty()).toString()).substr(0,4);
-    this.completedAmount= ethers.utils.formatEther((await this.contract.completedAmount()).toString()).substr(0,4);
-    this.completedBounty= ethers.utils.formatEther((await this.contract.completedBounty()).toString()).substr(0,4);
+    if(this.contract){
+      this.pendingAmount= ethers.utils.formatEther((await this.contract.outAmount()).toString()).substr(0,4);
+      this.pendingBounty= ethers.utils.formatEther((await this.contract.outBounty()).toString()).substr(0,4);
+      this.completedAmount= ethers.utils.formatEther((await this.contract.completedAmount()).toString()).substr(0,4);
+      this.completedBounty= ethers.utils.formatEther((await this.contract.completedBounty()).toString()).substr(0,4);
+    }
   }
   async connect(){
     try{
@@ -95,6 +100,7 @@ class App extends Component{
         this.provider=new ethers.providers.Web3Provider(window.ethereum);
         if(this.chain=='0x38'){
           this.chain = 'Mainnet';
+          this.contractAddress = mainContract;
         }
         else if(this.chain=='0x61'){
           this.chain = 'Testnet';
@@ -106,6 +112,7 @@ class App extends Component{
         }
       }
       if(!this.hooked){
+        this.contract = new ethers.Contract(this.contractAddress, this.abi, this.provider.getSigner());
         document.getElementById("maxNumOrders").value =this.maxOrders.toString();
         document.getElementById("maxTimeOrders").value = "7";
         document.getElementById("minTimeOrders").value = "0";
@@ -119,29 +126,33 @@ class App extends Component{
             this.bountyColor=selectedSidebar;
             this.incomingColor=deselectedSidebar;
             this.sentColor=deselectedSidebar;
-            this.provider=new ethers.providers.Web3Provider(window.ethereum);
           }
           else{
             this.address="Not Connected";
           }
         });
         window.ethereum.on('chainChanged', (chain) => {
+          //window.location.reload(false);
           if(chain=='0x38'){
             this.chain = 'Mainnet';
-            //this.loadTotalAmounts();
+            this.contractAddress = mainContract;
+            this.provider=new ethers.providers.Web3Provider(window.ethereum);
+            this.contract = new ethers.Contract(this.contractAddress, this.abi, this.provider.getSigner());
+            this.handleBounty();
+            this.loadTotalAmounts();
           }
           else if(chain=='0x61'){
             this.chain = 'Testnet';
             this.contractAddress=testContract;
-            this.loadBounty();
-            this.bountyColor=selectedSidebar;
-            this.incomingColor=deselectedSidebar;
-            this.sentColor=deselectedSidebar;
+            this.provider=new ethers.providers.Web3Provider(window.ethereum);
+            this.contract = new ethers.Contract(this.contractAddress, this.abi, this.provider.getSigner());
+            this.handleBounty();
             this.loadTotalAmounts();
           }
           else{
             this.chain = null;
             this.contractAddress=null;
+            this.contract=null;
           }
         });
         this.hooked=true;
@@ -157,10 +168,6 @@ class App extends Component{
     if(this.address=="Not Connected"){
       try{
         window.alert("Sorry\nFeature not developed yet!")
-        /*const providerOptions = {
-          const provider = new WalletConnectProvider({
-            infuraId: "27e484dcd9e3efcfd25a83a78777cdf1", // Required
-          });*/
       }
       catch(e){}
     }
@@ -186,7 +193,7 @@ class App extends Component{
     return str;
   }
   elapsedTime(d){
-    if(d<0){
+    if(d <= 0){
       return 0;
     }
     let s = Math.trunc(d/86400).toString();
@@ -222,19 +229,23 @@ class App extends Component{
         let time = await this.contract.orderHeads(this.address,party);
         let order = await this.contract.orders(this.address,party,time);
         let fin = null;
+        let i =0; const j = parseInt(this.maxOrders.toString());
         while(!time.isZero()){
           if(order.finalized){fin="Yes";}
           else{fin="No";}
-          x.push({
-            Sender: this.address,
-            Receiver: party,
-            "Finalized?": fin,
-            "Epoch Time ↕": time.toString(),
-            Time: this.secToDate(new Date(time.mul('1000').toNumber())),//new Date(Date.now(time)).toISOString()
-            "Bounty ↕": ethers.utils.formatEther(order.bounty.toString()),
-            "Amount ↕": ethers.utils.formatEther(order.amount.toString()),
-            "Countdown ↕": this.elapsedTime(time.toString()-Math.trunc(Date.now()/1000))
-          });
+          if(BigNumber(time).isLessThan(this.maxSeconds)&&BigNumber(time).isGreaterThan(this.minSeconds)){
+            x.push({
+              Sender: this.address,
+              Receiver: party,
+              "Finalized?": fin,
+              "Epoch Time ↕": time.toString(),
+              Time: this.secToDate(new Date(time.mul('1000').toNumber())),//new Date(Date.now(time)).toISOString()
+              "Bounty ↕": ethers.utils.formatEther(order.bounty.toString()),
+              "Amount ↕": ethers.utils.formatEther(order.amount.toString()),
+              "Countdown ↕": this.elapsedTime(time.toString()-Math.trunc(Date.now()/1000))
+            });
+            i++;
+          }
           time=order.next;
           order = await this.contract.orders(this.address,party,time);
         }
@@ -254,19 +265,23 @@ class App extends Component{
         let time = await this.contract.orderHeads(party,this.address);
         let order = await this.contract.orders(party,this.address,time);
         let fin = null;
-        while(!time.isZero()){
+        let i =0; const j = parseInt(this.maxOrders.toString());
+        while((!time.isZero())&&i<j){
           if(order.finalized){fin="Yes";}
           else{fin="No";}
-          x.push({
-            Sender: this.address,
-            Receiver: party,
-            "Finalized?": fin,
-            "Epoch Time ↕": time.toString(),
-            Time: this.secToDate(new Date(time.mul('1000').toNumber())),//new Date(Date.now(time)).toISOString()
-            "Bounty ↕": ethers.utils.formatEther(order.bounty.toString()),
-            "Amount ↕": ethers.utils.formatEther(order.amount.toString()),
-            "Countdown ↕": this.elapsedTime(time.toString()-Math.trunc(Date.now()/1000))
-          });
+          if(BigNumber(time).isLessThan(this.maxSeconds)&&BigNumber(time).isGreaterThan(this.minSeconds)){
+            x.push({
+              Sender: this.address,
+              Receiver: party,
+              "Finalized?": fin,
+              "Epoch Time ↕": time.toString(),
+              Time: this.secToDate(new Date(time.mul('1000').toNumber())),//new Date(Date.now(time)).toISOString()
+              "Bounty ↕": ethers.utils.formatEther(order.bounty.toString()),
+              "Amount ↕": ethers.utils.formatEther(order.amount.toString()),
+              "Countdown ↕": this.elapsedTime(time.toString()-Math.trunc(Date.now()/1000))
+            });
+            i++;
+          }
           time=order.next;
           order = await this.contract.orders(party,this.address,time);
         }
@@ -311,10 +326,8 @@ class App extends Component{
     //TODO add contract into ethers to load data
     //https://github.com/pancakeswap/pancake-frontend/blob/develop/src/utils/lotteryUtils.ts
     this.orderFilter();
+    this.loadTotalAmounts();
     if(await this.isConnected()){
-      if(!this.contract||this.contractAddress.toLowerCase()!=this.contract.address.toLowerCase()){
-        this.contract = new ethers.Contract(this.contractAddress, this.abi, this.provider.getSigner());
-      }
       let user = await this.contract.head();
       let party = await this.contract.partyHeads(user);
       let time = (await this.contract.orderHeads(user,party)).toString();
@@ -328,7 +341,7 @@ class App extends Component{
           while(i<j&&"0"!=time){
             if(order.finalized){fin="Yes";}
             else{fin="No";}
-            if(BigNumber(time).isLessThan(this.maxSeconds)){
+            if(BigNumber(time).isLessThan(this.maxSeconds)&&BigNumber(time).isGreaterThan(this.minSeconds)){
               x.push({
                 Sender: user,
                 Receiver: party,
@@ -384,7 +397,7 @@ class App extends Component{
   }
   async send(receiver,time,amount,bounty,finalized){
     receiver.replace(/\s+/g, '');
-    time.replace(/\s+'&nbsp'+/g, '');
+    time.replace(/\s+/g, '');
     amount.replace(/\s+/g, '');
     bounty.replace(/\s+/g, '');
     time=this.stringCleaner(time);
@@ -394,8 +407,10 @@ class App extends Component{
     if(await this.isConnected())
     {
       try{
+        let d = new Date(0);
+        d.setUTCSeconds(parseInt(time));
         const confirm = "Receiver - "+ receiver
-                        +"\nTime              - "+ this.secToDate(new Date(parseInt(time)))
+                        +"\nTime              - "+ this.secToDate(d)
                         +"\n Amount         - "+amount+ " BNB"
                         +"\n Bounty / Fee - "+bounty+ " BNB"
                         +"\n Finalized?     - "+(finalized?"Yes":"No");
@@ -437,9 +452,11 @@ class App extends Component{
     {
       try{
         const order = await this.contract.orders(this.address,receiver,time);
+        let d = new Date(0);
+        d.setUTCSeconds(parseInt(time));
         const confirm = "Are you sure you want to Finalize ?"
                         +"\nReceiver - "+ receiver
-                        +"\nTime              - "+ this.secToDate(new Date(parseInt(time)))
+                        +"\nTime              - "+ this.secToDate(d)
                         +"\n Amount         - "+ethers.utils.formatEther(order.amount.toString())+ " BNB"
                         +"\n Bounty / Fee - "+ethers.utils.formatEther(order.bounty.toString())+ " BNB"
                         +"\n Finalized?     - "+(order.finalized?"Yes":"No");
@@ -474,10 +491,12 @@ class App extends Component{
     if(await this.isConnected()){
       try{
         const order = await this.contract.orders(sender,receiver,time);
+        let d = new Date(0);
+        d.setUTCSeconds(parseInt(time));
         const confirm = "Are you sure you want to Add to Order ?"
                         +"\n Sender - "+ sender
                         +"\n Receiver - "+ receiver
-                        +"\n Time              - "+ this.secToDate(new Date(parseInt(time)))
+                        +"\n Time              - "+ this.secToDate(d)
                         +"\n Current BNB to Send  - "+ethers.utils.formatEther(order.amount.toString())+ " BNB"
                         +"\n Current Bounty / Fee - "+ethers.utils.formatEther(order.bounty.toString())+ " BNB"
                         +"\n Adding - "+bnb+" to "+(isBounty?"Bounty":"Sent amount");
@@ -514,9 +533,11 @@ class App extends Component{
     if(await this.isConnected()){
       try{
         const order= await this.contract.orders(this.address,receiver,time);
+        let d = new Date(0);
+        d.setUTCSeconds(parseInt(time));
         const confirm = "Are you sure you want to Modify Order ?"
                         +"\n Receiver - "+ receiver
-                        +"\n Time              - "+ this.secToDate(new Date(parseInt(time)))
+                        +"\n Time              - "+ this.secToDate(d)
                         +"\n Current BNB to Send  - "+ethers.utils.formatEther(order.amount.toString())+ " BNB"
                         +"\n Current Bounty / Fee - "+ethers.utils.formatEther(order.bounty.toString())+ " BNB"
                         +"\n Removing - "+bnb+" from "+(isBounty?"Bounty":"Sent amount");
@@ -529,8 +550,8 @@ class App extends Component{
         else if(!this.isUint(bnb)){
           window.alert("Invalid amount");
         }
-        else if (isBounty==false&&!BigNumber(bnb).multipliedBy("1000000000000000000").minus(order.amount).isNegative()){
-          window.alert("  Amount  must be less than \n total order amount to be sent \n     (cancel order instead)");
+        else if (isBounty==false&&BigNumber(order.amount.toString()).isLessThanOrEqualTo(BigNumber(bnb).multipliedBy("1000000000000000000"))){
+          window.alert("  Amount must be less than \n total order amount to be sent \n     (cancel order instead)");
         }
         else if (isBounty==true&&BigNumber(order.bounty.toString()).isLessThan(BigNumber(bnb).multipliedBy("1000000000000000000"))){
           window.alert("Bounty to remove from order cannot be\n   greater than total bounty in order");
@@ -621,10 +642,10 @@ class App extends Component{
       }
       i++;
     }
-    return x;
+    return x.split(' ').join('');
   }
   isTime(str){
-    return (/^[0-9]*$/.test(str)&& !(BigNumber(str).isZero())&&
+    return (/^[0-9]*$/.test(str)&& (BigNumber(str).isGreaterThan("0"))&&
     BigNumber(str).isLessThan(BigNumber("115792089237316195423570985008687907853269984665640564039457584007913129639935")));
   }
   rowSelected(row){
@@ -635,18 +656,19 @@ class App extends Component{
     document.getElementById("bounty").value =row.data["Bounty ↕"];
   }
   render(){
+    document.title="BSC Timer";
     return(
       <div>{/*all elements must be contained in 1 div*/}
-        <Navbar sticky="top" bg = 'dark' style={{maxHeight:"55px",whiteSpace:"nowrap",width:"1518px"}}>
+        <Navbar sticky="top" bg = 'dark' style={{maxHeight:"55px",whiteSpace:"nowrap",minWidth:"1300px"}}>
           {/*<Navbar.Brand href="./">*/}
           <Navbar.Brand>
             <h3 style = {{color: 'yellow'}}>BSC Timer ⌛ </h3>
           </Navbar.Brand>
           <Navbar.Collapse>
             <DropdownButton id="dropdown-basic-button" title={this.address.substr(0,15)} style={{maxWidth:"10%",fontWeight:"bold",cursor:"pointer",color:"#3471eb"}}>
-              <Button as="input"type ="Button"value="Browser Wallet"onClick={this.connect} style={{width:"160px",height:"50px",marginBottom:"8px"}}/>
-              <br></br>
-              <Button as="input"type ="Button"value="Wallet Connect"onClick={this.wallet_connect}style={{width:"160px",height:"50px"}}/>
+              <Button as="input"type ="Button"value="Browser Wallet"onClick={this.connect} style={{width:"160px",height:"55px",marginBottom:"0px",marginTop:"0px"}}/>
+              {/*<br></br>
+              <Button as="input"type ="Button"value="Wallet Connect"onClick={this.wallet_connect}style={{width:"160px",height:"50px"}}/>*/}
             </DropdownButton>
             <Button as="input"type="Button"onClick={this.handleConverter}value="Epoch Time Converter"style={{fontSize:"15px",backgroundColor:"#d13f0f",marginRight:"8px",marginLeft:"40px",height:"40px",maxWidth:"180px",fontWeight:"bold",cursor:"pointer",backgroundColor:"#f05e1a"}}block/>
           <div>
@@ -670,11 +692,17 @@ class App extends Component{
               / Completed = {this.completedAmount}
             </h10>
           </div>
-          <p style={{fontSize:"12px",color:'#00b7db',position:'relative',left:'100px',top:'10px'}}>
-            {this.chain} {this.address!="Not Connected"?"Contract":""} {" "}
-            <br></br>
-            {this.contractAddress}
-          </p>
+          <div>
+            <a href="https://t.me/bsctimer" style={{marginLeft:"10px"}}>
+              <img src="https://osx.telegram.org/updates/site/logo.png" alt="telegram" width="40px" height="40px"></img>
+            </a>
+            <a href="https://twitter.com/solidityworks" style={{marginLeft:"10px"}}>
+              <img src="https://twemoji.twitter.com/content/dam/twemoji-twitter/Twitter_Social_Icon_Circle_Color.png.twimg.1920.png" alt="twitter" width="36px" height="36px"></img>
+            </a>
+            <a href="https://github.com/thelambodan/bsc-timer/tree/master">
+              <img src="https://logos-world.net/wp-content/uploads/2020/11/GitHub-Logo.png" alt="github" width="70px" height="35px"></img>
+            </a>
+          </div>
           </Navbar.Collapse>
         </Navbar>
         <div id="sidebar" style={{backgroundColor:"#4e8eca",width:"190px",minHeight:"720px",float:"left"}}>
@@ -688,7 +716,7 @@ class App extends Component{
               {"Receiver"}
               <input id ="receiver" type="text"pattern="^(0x)?[0-9a-fA-F]{40}\s*$"style={{width:"180px",marginTop:"3px"}}/>
               {"Epoch Time"}
-              <input id ="time" type="number" pattern="^\d*\s*$"style={{width:"180px",marginTop:"3px"}}/>
+              <input id ="time" type="text" pattern="^\s*\d*\s*"style={{width:"180px",marginTop:"3px"}}/>
               {"BNB Amount"}
               <input id ="amount" type="text"pattern="^\d*\.?\d{0,18}\s*$"style={{width:"180px",marginTop:"3px"}}/>
               {"Order Execution Bounty"}
@@ -725,7 +753,7 @@ class App extends Component{
                 document.getElementById("finalize").value2
               )}
               style={{backgroundColor:"green",fontSize:"13px",fontWeight:"bold",cursor:"pointer",
-              color:"#2eff5f",marginLeft:"3px",minWidth:"70px",marginTop:"5px",height:"40px"}}/>
+              color:"#62ff00",marginLeft:"3px",minWidth:"70px",marginTop:"5px",height:"40px"}}/>
             <Button as="input"type ="Button"value="Release"onClick={() => this.release(
                 document.getElementById("sender").value,
                 document.getElementById("receiver").value,
@@ -766,7 +794,7 @@ class App extends Component{
             <Button as="input"type ="Button"value="Decrease Amount -"onClick={() => this.removeFromOrder(
               document.getElementById("receiver").value,
               document.getElementById("time").value,
-              document.getElementById("bounty").value,
+              document.getElementById("amount").value,
               false
             )}style={{
               backgroundColor:"green",minWidth:"100px",fontSize:"13px",fontWeight:"bold",cursor:"pointer",
@@ -782,7 +810,7 @@ class App extends Component{
           </div>
         </div>
         <h7 style={{color:"yellow"}}>
-          <div id="viewer" style={{backgroundColor:"#1f1f1f",width:"1500",height:"720px"}}>
+          <div id="viewer" style={{backgroundColor:"#1f1f1f",width:"auto",minWidth:"1300px",height:"720px"}}>
               <div id="infoBox" style={{overflowX:'hidden',overflowY:'auto',position:'relative',backgroundColor:"#1f1f1f",height:"inherit",padding:"10px"}}>
                 <div style={{marginLeft:"10px",color: "orange"}}>
                   Selectable Rows ?
@@ -806,13 +834,18 @@ class App extends Component{
                     <input id ="minTimeOrders" type="number"min="0" pattern="^\d*\s*$"style={{marginLeft:"10px",marginRight:"10px",width:"100px",marginTop:"3px"}}/>
                     {" ≤ Countdown Days ≤ "}
                     <input id ="maxTimeOrders" type="number"min="0" pattern="^\d*\s*$"style={{marginLeft:"10px",marginRight:"10px",width:"100px",marginTop:"3px"}}/>
-                    <div style={{position:'relative',left:'690px',top:'-30px'}}>
+                    <div style={{position:'relative',left:'650px',top:'-30px'}}>
                       <Button as="input"type ="Button"value="↻"onClick={this.handleBounty} style={{color:"yellow",fontWeight:'bold',padding:"2px",paddingLeft:"7px",paddingBottom:"7px",
                         paddingRight:"7px",fontSize:'25px',borderRadius:"100px",lineHeight:'0em',backgroundColor:"#3471eb",marginLeft:"30px",width:"20x",height:"35px",marginBottom:"8px"}}/>
                     </div>
+                    <p style={{height:"25",fontSize:"12px",color:'#00b7db',position:'relative',left:'750px',top:'-70px'}}>
+                      {this.chain} {this.address!="Not Connected"?"Contract":""} {" "}
+                      <br></br>
+                      {this.contractAddress}
+                    </p>
                   </div>
                 </div>
-                <hr style={{marginTop:"-70px",borderColor:"#4e8eca"}}></hr>
+                <hr style={{marginTop:"-120px",borderColor:"#4e8eca"}}></hr>
                 <hr style={{marginTop:"-30px",borderColor:"#4e8eca",position:'relative',top:'45px'}}></hr>
                 <AgGridReact
                   id="grid"
